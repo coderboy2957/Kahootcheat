@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kahoot Solutions Hub</title>
+    <title>Kahoot Solutions Viewer</title>
     <style>
         :root {
             --bg: #090d16;
@@ -83,7 +83,7 @@
             font-size: 1rem;
             cursor: pointer;
             transition: background 0.2s, transform 0.1s;
-            margin-top: 5px;
+            margin-top: 8px;
         }
         button:hover { background: var(--accent-hover); }
         button:active { transform: scale(0.98); }
@@ -153,20 +153,20 @@
         <!-- Input Screen -->
         <div class="card" id="input-screen">
             <h2>🎯 Kahoot Solutions Hub</h2>
-            <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 20px;">Finde blitzschnell alle richtigen Antworten.</p>
+            <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 20px;">Finde alle Antworten über den Namen oder den Link.</p>
             
-            <!-- Option 1: Suche per Name/Begriff -->
+            <!-- Option 1: Suche per Name -->
             <div class="input-group">
-                <label>Option 1: Nach Kahoot-Namen / Thema suchen</label>
+                <label>1. Nach Kahoot-Namen / Thema suchen</label>
                 <input type="text" id="search-query" placeholder="z.B. Vokabeln Englisch Unit 1" autocomplete="off">
-                <button onclick="searchKahoot()">Quiz über Suche finden</button>
+                <button onclick="searchKahoot()">Quiz suchen</button>
             </div>
 
-            <hr style="border: 0; border-top: 1px solid var(--border); margin: 20px 0;">
+            <div style="margin: 20px 0; color: var(--text-muted); font-size: 0.85rem;">— ODER —</div>
 
-            <!-- Option 2: Direktlink / UUID -->
+            <!-- Option 2: Direktlink -->
             <div class="input-group">
-                <label>Option 2: Direktlink oder ID einfügen</label>
+                <label>2. Kahoot-Link einfügen</label>
                 <input type="text" id="kahoot-url" placeholder="https://create.kahoot.it/details/..." autocomplete="off">
                 <button onclick="loadByUrl()" style="background: #3b82f6;">Direkt laden</button>
             </div>
@@ -193,17 +193,17 @@
             const statusEl = document.getElementById('status');
 
             if (!query) {
-                statusEl.innerText = "Bitte gib einen Suchbegriff ein!";
+                statusEl.innerText = "Bitte einen Suchbegriff eingeben!";
                 return;
             }
 
-            statusEl.innerHTML = '<span class="spinner"></span> Suche Quiz...';
+            statusEl.innerHTML = '<span class="spinner"></span> Suche läuft...';
 
             try {
                 const searchApi = `https://create.kahoot.it/rest/kahoots/?query=${encodeURIComponent(query)}&limit=1`;
                 const res = await fetch(proxyUrl + encodeURIComponent(searchApi));
                 
-                if (!res.ok) throw new Error("Verbindungsfehler zur Kahoot-Suche.");
+                if (!res.ok) throw new Error("Netzwerkfehler bei der Suche.");
 
                 const data = await res.json();
                 if (!data.entities || data.entities.length === 0) {
@@ -223,7 +223,7 @@
             const statusEl = document.getElementById('status');
 
             if (!inputVal) {
-                statusEl.innerText = "Bitte gib einen Link oder eine ID ein!";
+                statusEl.innerText = "Bitte einen Link einfügen!";
                 return;
             }
 
@@ -305,6 +305,10 @@
             document.getElementById('kahoot-url').value = '';
             document.getElementById('status').innerText = '';
         }
+
+        // Enter-Tasten-Unterstützung
+        document.getElementById('search-query').addEventListener('keypress', (e) => { if (e.key === 'Enter') searchKahoot(); });
+        document.getElementById('kahoot-url').addEventListener('keypress', (e) => { if (e.key === 'Enter') loadByUrl(); });
     </script>
 </body>
 </html>
