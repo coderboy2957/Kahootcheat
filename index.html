@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kahoot PIN Solutions Finder</title>
+    <title>Kahoot Solutions Hub</title>
     <style>
         :root {
             --bg: #090d16;
@@ -45,17 +45,27 @@
 
         h2 { margin-top: 0; color: #38bdf8; }
 
+        .input-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
         input {
             width: 100%;
             padding: 14px;
-            margin: 10px 0;
             border-radius: 12px;
             border: 1px solid #2d3748;
             background: var(--bg);
             color: var(--text);
-            font-size: 1.2rem;
-            text-align: center;
-            letter-spacing: 2px;
+            font-size: 1rem;
             box-sizing: border-box;
             outline: none;
             transition: border-color 0.2s;
@@ -73,13 +83,14 @@
             font-size: 1rem;
             cursor: pointer;
             transition: background 0.2s, transform 0.1s;
+            margin-top: 5px;
         }
         button:hover { background: var(--accent-hover); }
         button:active { transform: scale(0.98); }
 
         .secondary-btn {
             background: #334155;
-            margin-top: 10px;
+            margin-top: 15px;
         }
         .secondary-btn:hover { background: #475569; }
 
@@ -121,11 +132,11 @@
         }
 
         .hidden { display: none; }
-        #status { color: #ef4444; font-size: 0.9rem; margin-top: 15px; min-height: 20px; }
+        #status { color: #f87171; font-size: 0.9rem; margin-top: 15px; min-height: 20px; }
         
         .spinner {
             display: inline-block;
-            width: 20px; height: 20px;
+            width: 18px; height: 18px;
             border: 3px solid rgba(255,255,255,.3);
             border-radius: 50%;
             border-top-color: #fff;
@@ -141,10 +152,25 @@
     <div class="container">
         <!-- Input Screen -->
         <div class="card" id="input-screen">
-            <h2>🎯 Kahoot PIN Solutions Finder</h2>
-            <p style="color: var(--text-muted); font-size: 0.95rem;">Gib einfach den 6-stelligen Spiel-PIN ein:</p>
-            <input type="text" id="game-pin" placeholder="z.B. 123456" maxlength="10" autocomplete="off">
-            <button onclick="loadQuizByPin()">Lösungen automatisch finden</button>
+            <h2>🎯 Kahoot Solutions Hub</h2>
+            <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 20px;">Finde blitzschnell alle richtigen Antworten.</p>
+            
+            <!-- Option 1: Suche per Name/Begriff -->
+            <div class="input-group">
+                <label>Option 1: Nach Kahoot-Namen / Thema suchen</label>
+                <input type="text" id="search-query" placeholder="z.B. Vokabeln Englisch Unit 1" autocomplete="off">
+                <button onclick="searchKahoot()">Quiz über Suche finden</button>
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid var(--border); margin: 20px 0;">
+
+            <!-- Option 2: Direktlink / UUID -->
+            <div class="input-group">
+                <label>Option 2: Direktlink oder ID einfügen</label>
+                <input type="text" id="kahoot-url" placeholder="https://create.kahoot.it/details/..." autocomplete="off">
+                <button onclick="loadByUrl()" style="background: #3b82f6;">Direkt laden</button>
+            </div>
+
             <div id="status"></div>
         </div>
 
@@ -152,68 +178,76 @@
         <div id="results-screen" class="hidden">
             <div class="card">
                 <h2 id="quiz-title">Quiz Titel</h2>
-                <p id="quiz-desc" style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px;"></p>
-                <button class="secondary-btn" onclick="resetView()">Anderen PIN eingeben</button>
+                <p id="quiz-desc" style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 10px;"></p>
+                <button class="secondary-btn" onclick="resetView()">← Anderes Quiz suchen</button>
             </div>
             <div id="questions-container"></div>
         </div>
     </div>
 
     <script>
-        async function loadQuizByPin() {
-            const pin = document.getElementById('game-pin').value.trim();
+        const proxyUrl = "https://corsproxy.io/?url=";
+
+        async function searchKahoot() {
+            const query = document.getElementById('search-query').value.trim();
             const statusEl = document.getElementById('status');
-            
-            if (!pin || pin.length < 4) {
-                statusEl.innerText = "Bitte gib einen gültigen Game-PIN ein!";
+
+            if (!query) {
+                statusEl.innerText = "Bitte gib einen Suchbegriff ein!";
                 return;
             }
 
-            statusEl.innerHTML = '<span class="spinner"></span> Suche Quiz zum PIN...';
+            statusEl.innerHTML = '<span class="spinner"></span> Suche Quiz...';
 
             try {
-                // 1. Schritt: Kahoot Controller API nach dem PIN fragen
-                const kahootControllerUrl = `https://kahoot.it/reserve/session/${pin}`;
-                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(kahootControllerUrl)}`;
-
-                const res = await fetch(proxyUrl);
-                if (!res.ok) throw new Error("PIN nicht gefunden oder Spiel ist nicht aktiv!");
-
-                const gameInfo = await res.json();
+                const searchApi = `https://create.kahoot.it/rest/kahoots/?query=${encodeURIComponent(query)}&limit=1`;
+                const res = await fetch(proxyUrl + encodeURIComponent(searchApi));
                 
-                // Manchmal liefert Kahoot direkt die Quiz-ID (UUID) im Payload oder wir müssen über den Titel suchen
-                // Da Kahoot die interne Quiz-ID im Live-Controller oft versteckt, nutzen wir alternativ den Quiz-Namen aus dem Spiel
-                const quizTitle = gameInfo.name || gameInfo.quizName;
-                
-                if (!quizTitle) {
-                    throw new Error("Konnte den Quiz-Namen zum PIN nicht ermitteln.");
+                if (!res.ok) throw new Error("Verbindungsfehler zur Kahoot-Suche.");
+
+                const data = await res.json();
+                if (!data.entities || data.entities.length === 0) {
+                    throw new Error("Kein passendes Quiz gefunden.");
                 }
 
-                statusEl.innerHTML = `<span class="spinner"></span> Gefunden: "${quizTitle}". Lade Lösungen...`;
+                const uuid = data.entities[0].card.uuid;
+                await loadQuizDetails(uuid);
 
-                // 2. Schritt: Über die öffentliche Kahoot-Suche das Quiz anhand des Namens/Titels finden
-                const searchUrl = `https://create.kahoot.it/rest/kahoots/?query=${encodeURIComponent(quizTitle)}&limit=1`;
-                const searchProxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(searchUrl)}`;
-                
-                const searchRes = await fetch(searchProxy);
-                const searchData = await searchRes.json();
+            } catch (err) {
+                statusEl.innerText = "Fehler: " + err.message;
+            }
+        }
 
-                if (!searchData.entities || searchData.entities.length === 0) {
-                    throw new Error(`Quiz "${quizTitle}" öffentlich nicht auffindbar.`);
-                }
+        async function loadByUrl() {
+            const inputVal = document.getElementById('kahoot-url').value.trim();
+            const statusEl = document.getElementById('status');
 
-                // Nimm die UUID des ersten Treffers
-                const quizUuid = searchData.entities[0].card.uuid;
+            if (!inputVal) {
+                statusEl.innerText = "Bitte gib einen Link oder eine ID ein!";
+                return;
+            }
 
-                // 3. Schritt: Die echten Fragen und Antworten laden
-                const detailsUrl = `https://create.kahoot.it/rest/kahoots/${quizUuid}`;
-                const detailsProxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(detailsUrl)}`;
-                
-                const detailsRes = await fetch(detailsProxy);
-                const quizData = await detailsRes.json();
+            statusEl.innerHTML = '<span class="spinner"></span> Lade Quiz...';
 
+            let quizId = inputVal;
+            if (inputVal.includes('kahoot.it')) {
+                const parts = inputVal.split('/');
+                quizId = parts[parts.length - 1];
+            }
+
+            await loadQuizDetails(quizId);
+        }
+
+        async function loadQuizDetails(uuid) {
+            const statusEl = document.getElementById('status');
+            try {
+                const detailsApi = `https://create.kahoot.it/rest/kahoots/${uuid}`;
+                const res = await fetch(proxyUrl + encodeURIComponent(detailsApi));
+
+                if (!res.ok) throw new Error("Quiz nicht gefunden oder privat.");
+
+                const quizData = await res.json();
                 renderQuiz(quizData);
-
             } catch (err) {
                 statusEl.innerText = "Fehler: " + err.message;
             }
@@ -230,7 +264,7 @@
             container.innerHTML = '';
 
             if (!quizData.questions || quizData.questions.length === 0) {
-                container.innerHTML = '<div class="card"><p>Keine Fragen in diesem Quiz gefunden.</p></div>';
+                container.innerHTML = '<div class="card"><p>Keine Fragen gefunden.</p></div>';
                 return;
             }
 
@@ -250,7 +284,7 @@
                         `;
                     });
                 } else {
-                    choicesHtml = '<p style="color: var(--text-muted); font-size: 0.85rem;">Fragetyp ohne Text-Antworten</p>';
+                    choicesHtml = '<p style="color: var(--text-muted); font-size: 0.85rem;">Keine Text-Antworten</p>';
                 }
 
                 container.innerHTML += `
@@ -267,13 +301,10 @@
         function resetView() {
             document.getElementById('results-screen').classList.add('hidden');
             document.getElementById('input-screen').classList.remove('hidden');
-            document.getElementById('game-pin').value = '';
+            document.getElementById('search-query').value = '';
+            document.getElementById('kahoot-url').value = '';
             document.getElementById('status').innerText = '';
         }
-
-        document.getElementById('game-pin').addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') loadQuizByPin();
-        });
     </script>
 </body>
 </html>
